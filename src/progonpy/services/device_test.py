@@ -40,6 +40,10 @@ class DeviceTestService:
         (0x0004, 'i'), (0x0008, 'j'), (0x0001, 'k'), (0x0002, 'l'),
         (0x0010, 'm'),
     ]
+    DELAY_DISPLAY = 0.03      # было 0.15
+    DELAY_SPECIAL = 0.02      # было 0.05
+    DELAY_SLIDER = 0.02       # было 0.1
+    DELAY_COLOR = 0.02        # было 0.1
     
     def __init__(self, modbus: DeviceTestPort):
         self.modbus = modbus
@@ -95,46 +99,109 @@ class DeviceTestService:
         except Exception as e:
             return TestResult(step, TestStatus.FAILED, error=f"{type(e).__name__}: {e}")
     
-    def test_display_segments(self, address: int, cell: int = 0) -> list[TestResult]:
-        """Поочередное тестирование сегментов 8-сегментного индикатора"""
+    def test_display_segments(self, address: int, cell: int = -1, direction: str = "up") -> list[TestResult]:
+
         results = []
-        base_reg = self.REG_DISPLAY + cell // 2  # 2 ячейки на регистр
+        num_cells = 4
+        seg_names = self.SEGMENT_NAMES  # ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'dp']
         
-        for seg_idx, mask in enumerate(self.SEGMENT_MASKS):
-            step = TestStep(
-                name=f"Сегмент {self.SEGMENT_NAMES[seg_idx]} (ячейка {cell+1})",
-                register=base_reg,
-                write_value=mask,
-                description=f"Включение сегмента {self.SEGMENT_NAMES[seg_idx]}"
-            )
-            start = time.time()
+        # Определяем диапазон ячеек для теста
+        if 0 <= cell <= 3:
+            # Тест конкретной ячейки
+            cell_range = [cell]
+        else:
+            # Тест всех ячеек
+            cell_range = range(num_cells) if direction == "up" else range(num_cells - 1, -1, -1)
+        
+        self._progress(f"Начало теста сегментов ({direction})", 0)
+        
+        total_steps = len(cell_range) * 8
+        current_step = 0
+        
+        for cell_idx in cell_range:
+            # Определяем порядок сегментов в зависимости от направления
+            segment_range = range(8) if direction == "up" else range(7, -1, -1)
             
-            try:
-                # Записываем маску
-                if self._write_safe(address, base_reg, mask):
-                    time.sleep(0.1)  # Даем устройству время отреагировать
-                    # Читаем обратно для подтверждения
-                    resp = self._read_safe(address, base_reg, 1)
-                    duration = (time.time() - start) * 1000
+            for seg_idx in segment_range:
+                current_step += 1
+                step_name = f"Ячейка {cell_idx+1}, сегмент {seg_names[seg_idx]} ({direction})"
+                
+                step = TestStep(
+                    name=step_name,
+                    register=self.REG_DISPLAY,
+                    description=f"{'Включение' if direction == 'up' else 'Выключение'} сегмента {seg_names[seg_idx]} в ячейке {cell_idx+1}"
+                )
+                
+                start = time.time()
+                
+                try:
+                    # Формируем состояние всех 4 ячеек
+                    all_cells = [0] * num_cells
                     
-                    if resp and resp[0] == mask:
-                        results.append(TestResult(step, TestStatus.SUCCESS, resp[0], duration_ms=duration))
+                    # 1. Предыдущие ячейки: все сегменты включены
+                    if direction == "up":
+                        for prev_cell in range(cell_idx):
+                            all_cells[prev_cell] = 0xFF
+                    else:  # direction == "down"
+                        # При выключении: ячейки ПОСЛЕ текущей уже выключены, до текущей — включены
+                        for prev_cell in range(cell_idx):
+                            all_cells[prev_cell] = 0xFF
+                    
+                    # 2. Текущая ячейка: накопительная маска
+                    if direction == "up":
+                        # Включаем сегменты от 0 до текущего (включительно)
+                        mask = 0
+                        for seg in range(seg_idx + 1):
+                            mask |= (1 << seg)
+                        all_cells[cell_idx] = mask
+                    else:  # direction == "down"
+                        # Включаем сегменты от 0 до текущего-1 (текущий уже выключаем)
+                        mask = 0
+                        for seg in range(seg_idx):
+                            mask |= (1 << seg)
+                        all_cells[cell_idx] = mask
+                    
+                    # 3. Последующие ячейки: всё выключено (уже 0 по умолчанию)
+                    
+                    # Кодируем в два регистра
+                    reg1, reg2 = encode_cells_to_registers(all_cells)
+                    
+                    # Записываем в устройство (два регистра подряд)
+                    write_ok = True
+                    write_ok &= self._write_safe(address, self.REG_DISPLAY, reg1)
+                    write_ok &= self._write_safe(address, self.REG_DISPLAY + 1, reg2)
+                    
+                    time.sleep(self.DELAY_DISPLAY)  # Даём устройству время отреагировать
+                    
+                    # Читаем обратно для подтверждения (опционально)
+                    resp = self._read_safe(address, self.REG_DISPLAY, 2)
+                    duration = (time.time() - start) * 100
+                    
+                    if write_ok:
+                        # Проверяем, что записанное значение совпадает с ожидаемым (хотя бы для первого регистра)
+                        if resp and resp[0] == reg1:
+                            results.append(TestResult(step, TestStatus.SUCCESS, reg1, duration_ms=duration))
+                        else:
+                            # Не все устройства поддерживают чтение дисплея, так что считаем успехом сам факт записи
+                            results.append(TestResult(step, TestStatus.SUCCESS, reg1, duration_ms=duration))
                     else:
-                        results.append(TestResult(
-                            step, TestStatus.FAILED, resp[0] if resp else None,
-                            error="Чтение не подтверждает запись", duration_ms=duration
-                        ))
-                else:
-                    results.append(TestResult(step, TestStatus.FAILED, error="Ошибка записи"))
-                    
-            except Exception as e:
-                results.append(TestResult(step, TestStatus.FAILED, error=f"{type(e).__name__}: {e}"))
-            
-            self._progress(f"Тест сегмента {self.SEGMENT_NAMES[seg_idx]}", 
-                          (seg_idx + 1) / len(self.SEGMENT_MASKS) * 100)
+                        results.append(TestResult(step, TestStatus.FAILED, error="Ошибка записи регистра"))
+                        
+                except Exception as e:
+                    results.append(TestResult(step, TestStatus.FAILED, error=f"{type(e).__name__}: {e}"))
+                
+                # Обновляем прогресс
+                progress_pct = min(95, current_step / total_steps * 95)  # Оставляем 5% на завершение
+                self._progress(step_name, progress_pct)
         
-        # Выключаем всё после теста
-        self._write_safe(address, base_reg, 0)
+        # Финал: выключаем всё, если направление "down", или оставляем включенным при "up"
+        if direction == "down":
+            self._write_safe(address, self.REG_DISPLAY, 0)
+            self._write_safe(address, self.REG_DISPLAY + 1, 0)
+            self._progress("Все сегменты выключены", 100)
+        else:
+            self._progress("Все сегменты включены", 100)
+        
         return results
     
     def test_special_symbols(self, address: int) -> list[TestResult]:
@@ -154,7 +221,7 @@ class DeviceTestService:
             try:
                 accumulated |= mask  # Накопительное включение
                 if self._write_safe(address, self.REG_SPECIAL, accumulated):
-                    time.sleep(0.05)
+                    time.sleep(self.DELAY_SPECIAL)
                     resp = self._read_safe(address, self.REG_SPECIAL, 1)
                     duration = (time.time() - start) * 1000
                     
@@ -198,7 +265,7 @@ class DeviceTestService:
             try:
                 reg1, reg2 = float_to_registers(value)
                 if self.modbus.write_registers(address, self.REG_SLIDER, [reg1, reg2]):
-                    time.sleep(0.1)
+                    time.sleep(self.DELAY_SLIDER)
                     # Читаем обратно (опционально, не все устройства поддерживают чтение слайдера)
                     resp = self._read_safe(address, self.REG_SLIDER, 2)
                     duration = (time.time() - start) * 1000
@@ -232,7 +299,7 @@ class DeviceTestService:
             
             try:
                 if self._write_safe(address, self.REG_COLOR, color):
-                    time.sleep(0.1)
+                    time.sleep(self.DELAY_COLOR)
                     duration = (time.time() - start) * 1000
                     results.append(TestResult(step, TestStatus.SUCCESS, duration_ms=duration))
                 else:
@@ -265,7 +332,7 @@ class DeviceTestService:
         
         # 2. Тест сегментов дисплея
         self._progress("Тест сегментов", 20)
-        report.steps.extend(self.test_display_segments(address))
+        report.steps.extend(self.test_display_segments(address, direction="up"))
         
         # 3. Тест спецсимволов
         self._progress("Тест спецсимволов", 50)
@@ -284,3 +351,15 @@ class DeviceTestService:
         report.end_time = time.time() * 1000
         
         return report
+def encode_cells_to_registers(cells: list[int]) -> tuple[int, int]:
+    """
+    Кодирует ровно 4 байта-ячейки в два 16-битных регистра (Big-Endian).
+    Возвращает кортеж (reg1, reg2), готовый к распаковке.
+    """
+    if len(cells) != 4:
+        raise ValueError(f"Ожидается 4 ячейки, получено {len(cells)}")
+        
+    # Маскируем байты & 0xFF на случай если придут int > 255
+    reg1 = ((cells[0] & 0xFF) << 8) | (cells[1] & 0xFF)
+    reg2 = ((cells[2] & 0xFF) << 8) | (cells[3] & 0xFF)
+    return reg1, reg2

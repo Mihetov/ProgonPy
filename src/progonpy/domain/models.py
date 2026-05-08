@@ -21,7 +21,7 @@ class SerialConfig:
     parity: str = 'N'      # 'N', 'E', 'O'
     stopbits: float = 1.0  # 1, 1.5, 2
     bytesize: int = 8
-    timeout: float = 1.0
+    timeout: float = 0.05
     
     def __post_init__(self):
         # Нормализация параметров для совместимости с pyserial
