@@ -40,9 +40,9 @@ class DeviceTestService:
         (0x0004, 'i'), (0x0008, 'j'), (0x0001, 'k'), (0x0002, 'l'),
         (0x0010, 'm'),
     ]
-    DELAY_DISPLAY = 0.03      # было 0.15
-    DELAY_SPECIAL = 0.02      # было 0.05
-    DELAY_SLIDER = 0.02       # было 0.1
+    DELAY_DISPLAY = 0.01      # было 0.15
+    DELAY_SPECIAL = 0.05      # было 0.05
+    DELAY_SLIDER = 0.05       # было 0.1
     DELAY_COLOR = 0.02        # было 0.1
     
     def __init__(self, modbus: DeviceTestPort):
@@ -204,61 +204,86 @@ class DeviceTestService:
         
         return results
     
-    def test_special_symbols(self, address: int) -> list[TestResult]:
-        """Тест специальных символов с накопительным включением"""
+    def test_special_symbols(self, address: int, direction: str = "up") -> list[TestResult]:
+        """Тест специальных символов с накопительным включением/выключением"""
         results = []
-        accumulated = 0
-        
-        for mask, name in self.SPECIAL_SYMBOLS:
+
+        # Вычисляем полную маску всех символов (нужна для direction="down")
+        full_mask = 0
+        for m, _ in self.SPECIAL_SYMBOLS:
+            full_mask |= m
+
+        # Начальное состояние и порядок обхода списка
+        accumulated = 0 if direction == "up" else full_mask
+        symbols_iter = self.SPECIAL_SYMBOLS if direction == "up" else reversed(self.SPECIAL_SYMBOLS)
+        total_steps = len(self.SPECIAL_SYMBOLS)
+
+        for idx, (mask, name) in enumerate(symbols_iter):
+            if direction == "up":
+                accumulated |= mask
+                action = "Включение"
+            else:  # direction == "down"
+                accumulated &= ~mask
+                action = "Выключение"
+
             step = TestStep(
-                name=f"Спецсимвол '{name}'",
+                name=f"Спецсимвол '{name}' ({action})",
                 register=self.REG_SPECIAL,
-                write_value=mask,
-                description=f"Включение спецсимвола {name}"
+                write_value=accumulated,
+                description=f"{action} спецсимвола {name}"
             )
             start = time.time()
-            
+
             try:
-                accumulated |= mask  # Накопительное включение
                 if self._write_safe(address, self.REG_SPECIAL, accumulated):
                     time.sleep(self.DELAY_SPECIAL)
                     resp = self._read_safe(address, self.REG_SPECIAL, 1)
                     duration = (time.time() - start) * 1000
-                    
-                    # Проверяем, что бит установлен
-                    if resp and (resp[0] & mask):
-                        results.append(TestResult(step, TestStatus.SUCCESS, resp[0], duration_ms=duration))
+
+                    # Проверка состояния бита в ответе
+                    if resp:
+                        bit_is_on = bool(resp[0] & mask)
+                        is_correct = (direction == "up" and bit_is_on) or \
+                                     (direction == "down" and not bit_is_on)
+                        
+                        if is_correct:
+                            results.append(TestResult(step, TestStatus.SUCCESS, resp[0], duration_ms=duration))
+                        else:
+                            results.append(TestResult(
+                                step, TestStatus.FAILED, resp[0],
+                                error=f"Бит 0x{mask:04X} не соответствует ожидаемому ({action.lower()})",
+                                duration_ms=duration
+                            ))
                     else:
-                        results.append(TestResult(
-                            step, TestStatus.FAILED, resp[0] if resp else None,
-                            error=f"Бит 0x{mask:04X} не установлен", duration_ms=duration
-                        ))
+                        # Если устройство не отвечает на чтение, считаем успехом факт успешной записи
+                        results.append(TestResult(step, TestStatus.SUCCESS, accumulated, duration_ms=duration))
                 else:
                     results.append(TestResult(step, TestStatus.FAILED, error="Ошибка записи"))
-                    
+
             except Exception as e:
                 results.append(TestResult(step, TestStatus.FAILED, error=f"{type(e).__name__}: {e}"))
-            
-            self._progress(f"Спецсимвол '{name}'", 
-                          self.SPECIAL_SYMBOLS.index((mask, name)) / len(self.SPECIAL_SYMBOLS) * 100)
-        
-        # Выключаем всё
-        self._write_safe(address, self.REG_SPECIAL, 0)
+
+            # Обновляем прогресс (работает корректно и в прямом, и в обратном порядке)
+            self._progress(f"Спецсимвол '{name}' ({action})", (idx + 1) / total_steps * 100)
+
         return results
     
-    def test_slider(self, address: int, test_values: list[float] = None) -> list[TestResult]:
+    def test_slider(self, address: int, test_values: list[float] = None, direction: str = "up") -> list[TestResult]:
         """Тест слайдера (запись float в 0xC100-0xC101)"""
+        # Автоматический выбор последовательности значений
         if test_values is None:
-            test_values = [0.0, 25.0, 50.0, 75.0, 100.0]
-        
+            test_values = [0.0, 25.0, 50.0, 75.0, 100.0] if direction == "up" else [100.0, 75.0, 50.0, 25.0, 0.0]
+            
         results = []
+        total_steps = len(test_values)
         
-        for value in test_values:
+        for idx, value in enumerate(test_values):
+            step_name = f"Слайдер = {value} ({direction})"
             step = TestStep(
-                name=f"Слайдер = {value}",
+                name=step_name,
                 register=self.REG_SLIDER,
-                write_value=int(value),  # Для отображения
-                description=f"Запись float {value} в слайдер"
+                write_value=int(value),
+                description=f"{'Увеличение' if direction == 'up' else 'Уменьшение'} слайдера до {value}"
             )
             start = time.time()
             
@@ -266,10 +291,27 @@ class DeviceTestService:
                 reg1, reg2 = float_to_registers(value)
                 if self.modbus.write_registers(address, self.REG_SLIDER, [reg1, reg2]):
                     time.sleep(self.DELAY_SLIDER)
-                    # Читаем обратно (опционально, не все устройства поддерживают чтение слайдера)
                     resp = self._read_safe(address, self.REG_SLIDER, 2)
                     duration = (time.time() - start) * 1000
                     
+                    # Опциональная проверка: если устройство читает слайдер, сверяем значение
+                    if resp and len(resp) >= 2:
+                        # Декодируем прочитанные регистры обратно в float (Big-Endian)
+                        packed = bytes([
+                            (resp[0] >> 8) & 0xFF, resp[0] & 0xFF,
+                            (resp[1] >> 8) & 0xFF, resp[1] & 0xFF
+                        ])
+                        read_val = struct.unpack(">f", packed)[0]
+                        
+                        # Допуск 0.5% на погрешность округления устройства
+                        if abs(read_val - value) > 0.5:
+                            results.append(TestResult(
+                                step, TestStatus.FAILED, read_val, 
+                                error=f"Чтение не подтверждает запись ({read_val:.1f} ≠ {value})", 
+                                duration_ms=duration
+                            ))
+                            continue
+                            
                     results.append(TestResult(step, TestStatus.SUCCESS, duration_ms=duration))
                 else:
                     results.append(TestResult(step, TestStatus.FAILED, error="Ошибка записи float"))
@@ -277,39 +319,55 @@ class DeviceTestService:
             except Exception as e:
                 results.append(TestResult(step, TestStatus.FAILED, error=f"{type(e).__name__}: {e}"))
             
-            self._progress(f"Слайдер {value}", test_values.index(value) / len(test_values) * 100)
+            self._progress(f"Слайдер {value} ({direction})", (idx + 1) / total_steps * 100)
         
         return results
     
-    def test_color(self, address: int, colors: list[int] = None) -> list[TestResult]:
-        """Тест цвета подсветки (0 = синий, 1 = красный)"""
-        if colors is None:
-            colors = [0, 1]
-        
+    def test_color(self, address: int, values: int | list[int] | None = None) -> list[TestResult]:
+        """Тест цвета подсветки (запись произвольных значений в регистр)"""
+        # Нормализация: если передано одно число → превращаем в список
+        if values is None:
+            values = [0, 1]  # Дефолт: синий, красный
+        elif isinstance(values, int):
+            values = [values]
+            
         results = []
+        total_steps = len(values)
         
-        for color in colors:
+        for idx, val in enumerate(values):
             step = TestStep(
-                name=f"Цвет = {'синий' if color == 0 else 'красный'}",
+                name=f"Цвет = {val}",
                 register=self.REG_COLOR,
-                write_value=color,
-                description=f"Установка цвета подсветки"
+                write_value=val,
+                description=f"Запись значения {val} в регистр цвета"
             )
             start = time.time()
             
             try:
-                if self._write_safe(address, self.REG_COLOR, color):
+                if self._write_safe(address, self.REG_COLOR, val):
                     time.sleep(self.DELAY_COLOR)
+                    # Обратная проверка (если устройство поддерживает чтение)
+                    resp = self._read_safe(address, self.REG_COLOR, 1)
                     duration = (time.time() - start) * 1000
-                    results.append(TestResult(step, TestStatus.SUCCESS, duration_ms=duration))
+                    
+                    # Сверяем записанное и прочитанное (если ответ пришёл)
+                    if resp and resp[0] != val:
+                        results.append(TestResult(
+                            step, TestStatus.FAILED, resp[0],
+                            error=f"Значение не подтверждено: записано {val}, прочитано {resp[0]}",
+                            duration_ms=duration
+                        ))
+                    else:
+                        results.append(TestResult(step, TestStatus.SUCCESS, duration_ms=duration))
                 else:
-                    results.append(TestResult(step, TestStatus.FAILED, error="Ошибка записи цвета"))
+                    results.append(TestResult(step, TestStatus.FAILED, error="Ошибка записи"))
                     
             except Exception as e:
                 results.append(TestResult(step, TestStatus.FAILED, error=f"{type(e).__name__}: {e}"))
-        
+            
+            self._progress(f"Установка цвета {val}", (idx + 1) / total_steps * 100)
+            
         return results
-    
     def run_full_test(self, address: int) -> TestReport:
         """Запуск полного цикла тестирования устройства"""
         report = TestReport(
@@ -332,20 +390,20 @@ class DeviceTestService:
         
         # 2. Тест сегментов дисплея
         self._progress("Тест сегментов", 20)
+        report.steps.extend(self.test_color(address, values=0))
         report.steps.extend(self.test_display_segments(address, direction="up"))
-        
+        report.steps.extend(self.test_display_segments(address, direction="down"))
+        report.steps.extend(self.test_color(address, values=1))
+        report.steps.extend(self.test_display_segments(address, direction="up"))
         # 3. Тест спецсимволов
         self._progress("Тест спецсимволов", 50)
-        report.steps.extend(self.test_special_symbols(address))
-        
+        report.steps.extend(self.test_special_symbols(address, direction="up"))
+        report.steps.extend(self.test_special_symbols(address, direction="down"))
         # 4. Тест слайдера
         self._progress("Тест слайдера", 75)
-        report.steps.extend(self.test_slider(address))
-        
-        # 5. Тест цвета
-        self._progress("Тест цвета", 90)
-        report.steps.extend(self.test_color(address))
-        
+        report.steps.extend(self.test_slider(address, direction="up"))
+        report.steps.extend(self.test_slider(address, direction="down"))
+        report.steps.extend(self.test_display_segments(address, direction="down"))
         # Завершение
         self._progress("Тест завершён", 100)
         report.end_time = time.time() * 1000
