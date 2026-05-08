@@ -1,12 +1,14 @@
+# src/progonpy/ui/main_window.py
 from __future__ import annotations
 
 import serial.tools.list_ports
-from PySide6.QtCore import QThreadPool
-from PySide6.QtWidgets import (
+from PySide2.QtCore import Qt, QThreadPool
+from PySide2.QtWidgets import (
     QComboBox,
     QFormLayout,
     QHBoxLayout,
     QLabel,
+    QTabWidget,
     QListWidget,
     QListWidgetItem,
     QMainWindow,
@@ -17,10 +19,10 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from progonpy.domain.models import DeviceType, SerialConfig
+from progonpy.domain.models import SerialConfig
 from progonpy.services.discovery import DeviceDiscoveryService
 from progonpy.workers.tasks import Task
-
+from progonpy.ui.test_panel import TestPanel
 
 class MainWindow(QMainWindow):
     def __init__(self, app_service) -> None:
@@ -34,6 +36,7 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(root)
         layout = QVBoxLayout(root)
 
+        # 1. Настройки подключения
         form = QFormLayout()
         self.port_box = QComboBox()
         self.port_box.addItems([p.device for p in serial.tools.list_ports.comports()])
@@ -46,6 +49,7 @@ class MainWindow(QMainWindow):
         form.addRow("Стоп-биты", self.stopbits_box)
         layout.addLayout(form)
 
+        # 2. Кнопки управления
         btns = QHBoxLayout()
         self.connect_btn = QPushButton("Подключить")
         self.scan_btn = QPushButton("Сканировать")
@@ -53,19 +57,52 @@ class MainWindow(QMainWindow):
         btns.addWidget(self.scan_btn)
         layout.addLayout(btns)
 
+        # 3. Диапазон сканирования
         range_line = QHBoxLayout()
-        self.start_spin = QSpinBox(); self.start_spin.setRange(1, 247); self.start_spin.setValue(1)
-        self.end_spin = QSpinBox(); self.end_spin.setRange(1, 247); self.end_spin.setValue(50)
-        range_line.addWidget(QLabel("ID от")); range_line.addWidget(self.start_spin)
-        range_line.addWidget(QLabel("до")); range_line.addWidget(self.end_spin)
+        self.start_spin = QSpinBox()
+        self.start_spin.setRange(1, 247)
+        self.start_spin.setValue(1)
+        self.end_spin = QSpinBox()
+        self.end_spin.setRange(1, 247)
+        self.end_spin.setValue(50)
+        range_line.addWidget(QLabel("ID от"))
+        range_line.addWidget(self.start_spin)
+        range_line.addWidget(QLabel("до"))
+        range_line.addWidget(self.end_spin)
         layout.addLayout(range_line)
 
+        # 4. Список устройств
         self.devices_list = QListWidget()
-        layout.addWidget(self.devices_list)
 
+        # === ИСПРАВЛЕНИЕ: Правильное создание вкладок ===
+        self.tabs = QTabWidget()
+        
+        # Вкладка 1: Список устройств
+        devices_tab = QWidget()
+        devices_layout = QVBoxLayout(devices_tab)
+        devices_layout.addWidget(self.devices_list)
+        self.tabs.addTab(devices_tab, "📋 Устройства")
+        
+        # Вкладка 2: Панель тестирования
+        self.test_panel = TestPanel(self.app_service.device_test)
+        self.tabs.addTab(self.test_panel, "🧪 Тест")
+        
+        # Добавляем виджет вкладок в основное окно
+        layout.addWidget(self.tabs)
+
+        # 5. Подключение сигналов
         self.connect_btn.clicked.connect(self.on_connect)
         self.scan_btn.clicked.connect(self.on_scan)
+        self.devices_list.currentItemChanged.connect(self._on_device_selected)
+        
         self._load_settings()
+
+    def _on_device_selected(self, current: QListWidgetItem, previous: QListWidgetItem) -> None:
+        """При клике на устройство передаём его адрес в тест-панель"""
+        if current:
+            device = current.data(Qt.UserRole)
+            if device:
+                self.test_panel.set_device(device.address)
 
     def _load_settings(self) -> None:
         config = self.app_service.load_settings()
@@ -105,6 +142,6 @@ class MainWindow(QMainWindow):
         self.devices_list.clear()
         for device in devices:
             item = QListWidgetItem(f"ID {device.address}")
-            item.setData(32, device)
+            item.setData(Qt.UserRole, device)
             self.devices_list.addItem(item)
         QMessageBox.information(self, "Сканирование", f"Найдено устройств: {len(devices)}")

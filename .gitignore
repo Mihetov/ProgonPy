@@ -1,2 +1,40 @@
+# === Python ===
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# === Виртуальные окружения ===
+venv/
+.venv/
+env/
+ENV/
+*.egg-info/
+
+# === Сборка PyInstaller ===
+# Папки сборки игнорируются, сам .spec файл оставляем в репозитории
+build/
+dist/
+*.spec.bak
+*.manifest
+
+# === Тесты, линтеры, кэш ===
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.log
+*.tmp
+
+# === IDE и редакторы ===
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# === ОС ===
+.DS_Store
+Thumbs.db
