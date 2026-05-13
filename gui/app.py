@@ -60,7 +60,7 @@ class MainWindow:
             bordercolor=panel_border,
             padding=12,
         )
-        style.configure("Card.TLabelframe.Label", background=panel, foreground=text, font=("Segoe UI Semibold", 13))
+        style.configure("Card.TLabelframe.Label", background=panel, foreground=text, font=("Segoe UI Semibold", 16))
 
         style.configure("App.TButton", font=("Segoe UI", 10), padding=(10, 7), borderwidth=0)
         style.map("App.TButton", background=[("!disabled", accent), ("active", "#3f8ddd")], foreground=[("!disabled", "#ffffff")])
