@@ -22,6 +22,8 @@ class MainWindow:
         self.poller = Poller(client, on_data=self.on_data)
         self.widget_factories = []
         self.active_widget = None
+        self.nav_buttons = {}
+        self.selected_widget_cls = None
 
         self._setup_style()
         self._build()
@@ -47,7 +49,8 @@ class MainWindow:
         style.configure("Panel.TFrame", background=panel)
 
         style.configure("App.TLabel", background=panel, foreground=text, font=("Segoe UI", 10))
-        style.configure("Muted.TLabel", background=side, foreground=muted, font=("Segoe UI", 10))
+        style.configure("Muted.TLabel", background=side, foreground=muted, font=("Segoe UI", 11))
+        style.configure("SidebarTitle.TLabel", background=side, foreground="#f2f6fb", font=("Segoe UI Semibold", 14))
 
         style.configure(
             "Card.TLabelframe",
@@ -57,7 +60,7 @@ class MainWindow:
             bordercolor=panel_border,
             padding=12,
         )
-        style.configure("Card.TLabelframe.Label", background=panel, foreground=text, font=("Segoe UI Semibold", 11))
+        style.configure("Card.TLabelframe.Label", background=panel, foreground=text, font=("Segoe UI Semibold", 13))
 
         style.configure("App.TButton", font=("Segoe UI", 10), padding=(10, 7), borderwidth=0)
         style.map("App.TButton", background=[("!disabled", accent), ("active", "#3f8ddd")], foreground=[("!disabled", "#ffffff")])
@@ -67,9 +70,21 @@ class MainWindow:
 
         style.configure("App.TEntry", fieldbackground="#0f1721", foreground=text, insertcolor=text)
         style.configure("App.TCombobox", fieldbackground="#0f1721", foreground=text)
+        style.map("App.TCombobox",
+                  fieldbackground=[("readonly", "#0f1721")],
+                  foreground=[("readonly", "#eef3f8")],
+                  selectforeground=[("readonly", "#eef3f8")],
+                  selectbackground=[("readonly", "#0f1721")])
 
-        style.configure("Nav.TButton", background=side, foreground=text, padding=(10, 8), anchor="w", relief="flat")
-        style.map("Nav.TButton", background=[("active", "#243244")], foreground=[("active", "#ffffff")])
+        style.configure("Nav.TButton", background="#1f2b38", foreground=text, padding=(10, 10), anchor="w", relief="flat", font=("Segoe UI", 11))
+        style.map("Nav.TButton", background=[("active", "#2a3a4d")], foreground=[("active", "#ffffff")])
+        style.configure("NavSelected.TButton", background="#3f8ddd", foreground="#ffffff", padding=(10, 10), anchor="w", relief="flat", font=("Segoe UI Semibold", 11))
+        style.map("NavSelected.TButton", background=[("active", "#3f8ddd")], foreground=[("active", "#ffffff")])
+
+        self.root.option_add("*TCombobox*Listbox.background", "#0f1721")
+        self.root.option_add("*TCombobox*Listbox.foreground", "#eef3f8")
+        self.root.option_add("*TCombobox*Listbox.selectBackground", "#314255")
+        self.root.option_add("*TCombobox*Listbox.selectForeground", "#ffffff")
 
     def _build(self):
         root_wrap = ttk.Frame(self.root, style="App.TFrame")
@@ -82,7 +97,7 @@ class MainWindow:
         self.right.pack(side="right", fill="both", expand=True, padx=(14, 0))
         self.left.pack_propagate(False)
 
-        ttk.Label(self.left, text="Модули", style="Muted.TLabel").pack(anchor="w", padx=12, pady=(12, 4))
+        ttk.Label(self.left, text="Модули", style="SidebarTitle.TLabel").pack(anchor="w", padx=12, pady=(12, 4))
         ttk.Label(self.left, text="Выбери виджет слева", style="Muted.TLabel").pack(anchor="w", padx=12, pady=(0, 12))
 
         self.nav_container = ttk.Frame(self.left, style="Sidebar.TFrame")
@@ -123,20 +138,27 @@ class MainWindow:
             ttk.Label(self.content_host, text="Нет доступных виджетов в gui/widgets", style="App.TLabel").pack(anchor="w", padx=12, pady=12)
             return
 
+        self.nav_buttons = {}
         for widget_cls in self.widget_factories:
             title = getattr(widget_cls, "PANEL_TITLE", widget_cls.__name__)
-            ttk.Button(
+            btn = ttk.Button(
                 self.nav_container,
                 text=title,
                 style="Nav.TButton",
                 command=lambda cls=widget_cls: self._show_widget(cls),
-            ).pack(fill="x", pady=4)
+            )
+            btn.pack(fill="x", pady=4)
+            self.nav_buttons[widget_cls] = btn
 
         self._show_widget(self.widget_factories[0])
 
     def _show_widget(self, widget_cls):
         for child in self.content_host.winfo_children():
             child.destroy()
+
+        self.selected_widget_cls = widget_cls
+        for cls, btn in self.nav_buttons.items():
+            btn.configure(style="NavSelected.TButton" if cls == widget_cls else "Nav.TButton")
 
         self.active_widget = widget_cls(
             self.content_host,
