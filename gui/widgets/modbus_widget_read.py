@@ -8,11 +8,15 @@ def parse_int(value):
 
 
 class ModbusWidgetRead(ttk.LabelFrame):
-    def __init__(self, parent, client, poller):
-        super().__init__(parent, text="Modbus Read", style="Card.TLabelframe")
+    IS_APP_WIDGET = True
+    PANEL_TITLE = "Modbus Read"
+
+    def __init__(self, parent, client, poller=None, on_log=None):
+        super().__init__(parent, text=self.PANEL_TITLE, style="Card.TLabelframe")
 
         self.client = client
         self.poller = poller
+        self.on_log = on_log
 
         self.slave = tk.StringVar(value="1")
         self.addr = tk.StringVar(value="0")
@@ -44,6 +48,10 @@ class ModbusWidgetRead(ttk.LabelFrame):
         body.columnconfigure(1, weight=1)
 
     def start(self):
+        if self.poller is None:
+            messagebox.showerror("Poller Error", "Poller is not configured")
+            return
+
         try:
             slave = parse_int(self.slave.get())
             addr = parse_int(self.addr.get())
@@ -59,6 +67,11 @@ class ModbusWidgetRead(ttk.LabelFrame):
 
         self.poller.configure(slave, addr, count, interval)
         self.poller.start()
+        if self.on_log:
+            self.on_log("Modbus live polling started")
 
     def stop(self):
-        self.poller.stop()
+        if self.poller:
+            self.poller.stop()
+            if self.on_log:
+                self.on_log("Modbus live polling stopped")
