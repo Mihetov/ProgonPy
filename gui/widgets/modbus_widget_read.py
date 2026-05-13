@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, messagebox
 
 
 def parse_int(value):
@@ -38,15 +38,21 @@ class ModbusWidgetRead(ttk.LabelFrame):
         ttk.Button(self, text="STOP", command=self.stop).pack(fill="x", pady=2)
 
     def start(self):
-        self.poller.configure(
-            parse_int(self.slave.get()),
-            parse_int(self.addr.get()),
-            parse_int(self.count.get()),
-            int(self.interval.get()) / 1000
-        )
+        try:
+            slave = parse_int(self.slave.get())
+            addr = parse_int(self.addr.get())
+            count = parse_int(self.count.get())
+            interval = int(self.interval.get()) / 1000
+        except ValueError:
+            messagebox.showerror("Input Error", "Fields must contain valid numeric values")
+            return
+
+        if slave < 0 or addr < 0 or count <= 0 or interval <= 0:
+            messagebox.showerror("Input Error", "slave/address must be >= 0, count/interval must be > 0")
+            return
+
+        self.poller.configure(slave, addr, count, interval)
         self.poller.start()
 
     def stop(self):
         self.poller.stop()
-
-    

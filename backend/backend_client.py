@@ -29,9 +29,6 @@ class BackendClient:
         self.log = logger or logging.getLogger("BackendClient")
         self._lock = threading.Lock()
 
-    # -----------------------------
-    # URL helper (ВАЖНО)
-    # -----------------------------
     def _build_url(self):
         return f"http://{self.host}:{self.port}"
 
@@ -40,9 +37,6 @@ class BackendClient:
             self.port = port
             self.url = self._build_url()
 
-    # -----------------------------
-    # RPC CORE (robust)
-    # -----------------------------
     def _rpc(self, method, params=None, timeout=2.0, retry=1):
         payload = {
             "jsonrpc": "2.0",
@@ -75,9 +69,6 @@ class BackendClient:
 
         return {"error": str(last_error)}
 
-    # -----------------------------
-    # SERVER LIFECYCLE
-    # -----------------------------
     def start_server(self, args=None):
         args = args or []
 
@@ -94,8 +85,7 @@ class BackendClient:
                 stderr=subprocess.DEVNULL
             )
 
-        # WAIT LOOP
-        for i in range(80):
+        for _ in range(80):
             resp = self._rpc("ping", timeout=1.0)
 
             if resp.get("result", {}).get("status") == "ok":
@@ -123,21 +113,16 @@ class BackendClient:
             self.state = BackendState.STOPPED
             self.transport_active = False
 
-    # -----------------------------
-    # STATE
-    # -----------------------------
     def is_ready(self):
         return self.state == BackendState.READY
 
-    # -----------------------------
-    # TRANSPORT
-    # -----------------------------
-    def open_rtu(self, port, baud=115200, stop_bits=1):
+    def open_rtu(self, port, baud=115200, stop_bits=1, parity="none"):
         resp = self._rpc("transport.open", {
             "type": "rtu",
             "serial_port": port,
             "baud_rate": baud,
-            "stop_bits": stop_bits
+            "stop_bits": stop_bits,
+            "parity": parity,
         })
 
         if "error" not in resp:
@@ -159,9 +144,6 @@ class BackendClient:
     def serial_ports(self):
         return self._rpc("transport.serial_ports")
 
-    # -----------------------------
-    # MODBUS
-    # -----------------------------
     def read(self, slave, address, count=1):
         if self.state != BackendState.READY:
             return {"error": "backend_not_ready"}
