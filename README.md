@@ -69,3 +69,35 @@ def __init__(self, parent, client, poller=None, on_log=None):
   - `ping`
   - `transport.open`, `transport.close`, `transport.status`, `transport.serial_ports`
   - `modbus.read`, `modbus.write`
+
+
+## Сборка в EXE (с сохранением модульных виджетов)
+
+Используем `PyInstaller` и **обязательно** подключаем все подмодули `gui.widgets`,
+чтобы динамическая загрузка через `pkgutil/importlib` продолжала работать в сборке.
+
+### 1) Установка сборщика
+
+```bash
+pip install pyinstaller
+```
+
+### 2) Сборка
+
+```bash
+python build_tools/build_exe.py
+```
+
+### Что важно для модульности
+
+- В build-команде используется:
+  - `--collect-submodules gui.widgets`
+  - `--collect-submodules gui.state`
+- Это гарантирует, что все виджеты попадут в сборку, даже если они не импортируются напрямую в `main.py`.
+- Механика `IS_APP_WIDGET` / `PANEL_TITLE` остается прежней: добавили модуль в `gui/widgets` → он будет доступен после пересборки EXE.
+
+### Результат
+
+После сборки исполняемый файл и окружение будут в:
+
+- `dist/ProgonPy/`
