@@ -31,6 +31,9 @@ class Poller:
 
     def stop(self):
         self.running = False
+        if self.thread and self.thread.is_alive():
+            self.thread.join(timeout=1.0)
+        self.thread = None
 
     def _loop(self):
         next_time = time.time()
@@ -44,6 +47,8 @@ class Poller:
                 )
 
                 data = resp.get("result", {})
+                if "error" in resp:
+                    data = {"error": resp.get("error")}
 
                 if self.on_data:
                     self.on_data(data)
