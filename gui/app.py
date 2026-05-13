@@ -25,6 +25,7 @@ class MainWindow:
         self.active_widget = None
         self.nav_buttons = {}
         self.selected_widget_cls = None
+        self.detached_windows = []
 
         self._setup_style()
         self._build()
@@ -113,6 +114,18 @@ class MainWindow:
         self.nav_container = ttk.Frame(self.left, style="Sidebar.TFrame")
         self.nav_container.pack(fill="both", expand=True, padx=8, pady=(0, 8))
 
+        right_top = ttk.Frame(self.right, style="App.TFrame")
+        right_top.pack(fill="x", pady=(2, 8))
+
+        self.detach_button = ttk.Button(
+            right_top,
+            text="↗",
+            width=3,
+            style="Secondary.TButton",
+            command=self._open_active_widget_in_window,
+        )
+        self.detach_button.pack(side="right")
+
         self.content_host = ttk.Frame(self.right, style="App.TFrame")
         self.content_host.pack(fill="both", expand=True)
 
@@ -165,6 +178,36 @@ class MainWindow:
         ttk.Label(body, text="Desktop GUI для Modbus/JSON-RPC интеграции", style="App.TLabel").pack(anchor="w", pady=(4, 8))
         ttk.Label(body, text=f"Версия сборки: {build_version}", style="App.TLabel").pack(anchor="w", pady=4)
         ttk.Label(body, text="Принцип версии: дата сборки (YYYY.MM.DD)", style="App.TLabel").pack(anchor="w", pady=4)
+
+
+    def _open_active_widget_in_window(self):
+        if self.selected_widget_cls is None:
+            return
+
+        win = tk.Toplevel(self.root)
+        title = getattr(self.selected_widget_cls, "PANEL_TITLE", self.selected_widget_cls.__name__)
+        win.title(f"{title} · Отдельное окно")
+        win.geometry("760x520")
+        win.configure(bg="#18222d")
+
+        host = ttk.Frame(win, style="App.TFrame")
+        host.pack(fill="both", expand=True, padx=12, pady=12)
+
+        widget = self.selected_widget_cls(
+            host,
+            self.client,
+            self.poller,
+            on_log=self.append_log,
+        )
+        widget.pack(fill="both", expand=True)
+
+        self.detached_windows.append(win)
+        win.protocol("WM_DELETE_WINDOW", lambda w=win: self._close_detached_window(w))
+
+    def _close_detached_window(self, window):
+        if window in self.detached_windows:
+            self.detached_windows.remove(window)
+        window.destroy()
 
     def _discover_widget_classes(self):
         widgets_path = Path(__file__).resolve().parent / "widgets"
@@ -237,6 +280,9 @@ class MainWindow:
 
     def _on_close(self):
         self.poller.stop()
+        for win in list(self.detached_windows):
+            if win.winfo_exists():
+                win.destroy()
         self.root.destroy()
 
     def run(self):
