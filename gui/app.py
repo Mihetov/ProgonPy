@@ -1,6 +1,7 @@
 import importlib
 import inspect
 import pkgutil
+from datetime import datetime
 from pathlib import Path
 
 import tkinter as tk
@@ -97,14 +98,73 @@ class MainWindow:
         self.right.pack(side="right", fill="both", expand=True, padx=(14, 0))
         self.left.pack_propagate(False)
 
-        ttk.Label(self.left, text="Модули", style="SidebarTitle.TLabel").pack(anchor="w", padx=12, pady=(12, 4))
+        header = ttk.Frame(self.left, style="Sidebar.TFrame")
+        header.pack(fill="x", padx=8, pady=(8, 2))
+
+        self.burger_button = ttk.Button(header, text="☰", width=3, style="Secondary.TButton", command=self._open_sidebar_menu)
+        self.burger_button.pack(side="left", padx=(0, 8))
+        ttk.Label(header, text="Модули", style="SidebarTitle.TLabel").pack(side="left")
         ttk.Label(self.left, text="Выбери виджет слева", style="Muted.TLabel").pack(anchor="w", padx=12, pady=(0, 12))
+
+        self.sidebar_menu = tk.Menu(self.root, tearoff=0)
+        self.sidebar_menu.add_command(label="Настройка программы", command=self._open_program_settings)
+        self.sidebar_menu.add_command(label="О программе", command=self._open_about)
 
         self.nav_container = ttk.Frame(self.left, style="Sidebar.TFrame")
         self.nav_container.pack(fill="both", expand=True, padx=8, pady=(0, 8))
 
         self.content_host = ttk.Frame(self.right, style="App.TFrame")
         self.content_host.pack(fill="both", expand=True)
+
+    def _open_sidebar_menu(self):
+        x = self.burger_button.winfo_rootx()
+        y = self.burger_button.winfo_rooty() + self.burger_button.winfo_height()
+        self.sidebar_menu.tk_popup(x, y)
+
+    def _open_program_settings(self):
+        win = tk.Toplevel(self.root)
+        win.title("Настройка программы")
+        win.geometry("760x560")
+        win.configure(bg="#18222d")
+
+        container = ttk.Frame(win, style="App.TFrame")
+        container.pack(fill="both", expand=True, padx=14, pady=14)
+
+        ttk.Label(container, text="Промышленная конфигурация", style="SidebarTitle.TLabel").pack(anchor="w", pady=(0, 10))
+
+        sections = [
+            ("Связь и надежность", ["Таймаут RPC (мс)", "Количество повторов", "Пауза между попытками (мс)"]),
+            ("Опрос и производительность", ["Интервал опроса по умолчанию (мс)", "Максимум регистров за запрос", "Лимит параллельных задач"]),
+            ("Журналирование и аудит", ["Уровень логирования", "Ротация логов (дни)", "Экспорт диагностики"]),
+            ("Безопасность и доступ", ["Требовать подтверждение на запись", "Защита критических адресов", "Роли оператор/инженер"]),
+        ]
+
+        for title, fields in sections:
+            group = ttk.LabelFrame(container, text=title, style="Card.TLabelframe")
+            group.pack(fill="x", pady=6)
+            body = ttk.Frame(group, style="Panel.TFrame")
+            body.pack(fill="x")
+            for i, field in enumerate(fields):
+                ttk.Label(body, text=field, style="App.TLabel").grid(row=i, column=0, sticky="w", pady=3)
+                ttk.Entry(body, style="App.TEntry").grid(row=i, column=1, sticky="ew", padx=(10, 0), pady=3)
+            body.columnconfigure(1, weight=1)
+
+    def _open_about(self):
+        win = tk.Toplevel(self.root)
+        win.title("О программе")
+        win.geometry("520x260")
+        win.configure(bg="#18222d")
+
+        build_version = datetime.now().strftime("%Y.%m.%d")
+
+        card = ttk.LabelFrame(win, text="ProgonPy", style="Card.TLabelframe")
+        card.pack(fill="both", expand=True, padx=14, pady=14)
+        body = ttk.Frame(card, style="Panel.TFrame")
+        body.pack(fill="both", expand=True)
+
+        ttk.Label(body, text="Desktop GUI для Modbus/JSON-RPC интеграции", style="App.TLabel").pack(anchor="w", pady=(4, 8))
+        ttk.Label(body, text=f"Версия сборки: {build_version}", style="App.TLabel").pack(anchor="w", pady=4)
+        ttk.Label(body, text="Принцип версии: дата сборки (YYYY.MM.DD)", style="App.TLabel").pack(anchor="w", pady=4)
 
     def _discover_widget_classes(self):
         widgets_path = Path(__file__).resolve().parent / "widgets"
