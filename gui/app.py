@@ -1,6 +1,8 @@
 import importlib
+import importlib.util
 import inspect
 import pkgutil
+import sys
 from datetime import datetime
 from pathlib import Path
 
@@ -210,23 +212,49 @@ class MainWindow:
         window.destroy()
 
     def _discover_widget_classes(self):
-        widgets_path = Path(__file__).resolve().parent / "widgets"
         module_prefix = "gui.widgets"
         discovered = []
 
-        for module_info in pkgutil.iter_modules([str(widgets_path)]):
-            if module_info.name.startswith("__"):
+        internal_widgets_path = Path(__file__).resolve().parent / "widgets"
+        external_widgets_path = Path(sys.executable).resolve().parent / "gui" / "widgets"
+
+        seen = set()
+
+        for path in (external_widgets_path, internal_widgets_path):
+            if not path.exists() or not path.is_dir():
                 continue
 
-            module_name = f"{module_prefix}.{module_info.name}"
-            module = importlib.import_module(module_name)
+            for module_info in pkgutil.iter_modules([str(path)]):
+                if module_info.name.startswith("__"):
+                    continue
 
-            for _, obj in inspect.getmembers(module, inspect.isclass):
-                if obj.__module__ != module_name:
+                key = (str(path), module_info.name)
+                if key in seen:
                     continue
-                if not getattr(obj, "IS_APP_WIDGET", False):
+                seen.add(key)
+
+                try:
+                    if path == external_widgets_path:
+                        module_file = path / f"{module_info.name}.py"
+                        dynamic_name = f"runtime_widgets.{module_info.name}"
+                        spec = importlib.util.spec_from_file_location(dynamic_name, module_file)
+                        if spec is None or spec.loader is None:
+                            continue
+                        module = importlib.util.module_from_spec(spec)
+                        spec.loader.exec_module(module)
+                    else:
+                        module_name = f"{module_prefix}.{module_info.name}"
+                        module = importlib.import_module(module_name)
+                except Exception as exc:
+                    self.append_log(f"Widget load error ({module_info.name}): {exc}")
                     continue
-                discovered.append(obj)
+
+                for _, obj in inspect.getmembers(module, inspect.isclass):
+                    if obj.__module__ != module.__name__:
+                        continue
+                    if not getattr(obj, "IS_APP_WIDGET", False):
+                        continue
+                    discovered.append(obj)
 
         discovered.sort(key=lambda cls: getattr(cls, "PANEL_TITLE", cls.__name__).lower())
         return discovered
