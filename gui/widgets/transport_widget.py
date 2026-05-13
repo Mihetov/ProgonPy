@@ -8,10 +8,14 @@ STOP_BITS_OPTIONS = ["1", "2"]
 
 
 class TransportWidget(ttk.LabelFrame):
-    def __init__(self, parent, client, on_log=None):
-        super().__init__(parent, text="Transport", style="Card.TLabelframe")
+    IS_APP_WIDGET = True
+    PANEL_TITLE = "Настройка COM-порта"
+
+    def __init__(self, parent, client, poller=None, on_log=None):
+        super().__init__(parent, text=self.PANEL_TITLE, style="Card.TLabelframe")
 
         self.client = client
+        self.poller = poller
         self.on_log = on_log
 
         self.port = tk.StringVar(value="")
@@ -54,7 +58,6 @@ class TransportWidget(ttk.LabelFrame):
 
     def refresh_ports(self):
         resp = self.client.serial_ports()
-
         if "error" in resp:
             self.port_combo["values"] = []
             self.port.set("")
