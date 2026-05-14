@@ -49,8 +49,8 @@ class DeviceTestWidget(ttk.LabelFrame):
     REG_obasis = 0xF004         # O-basis
     REG_sdescript = 0xF800      # Описание устройства
     # Параметры сканирования по умолчанию
-    MAX_BASIS = 8
-    MAX_SEGMENT_REGS = 4
+    MAX_BASIS = 12
+    MAX_SEGMENT_REGS = 6
     DEFAULT_SCAN_START = 1
     DEFAULT_SCAN_END = 247
     SCAN_TIMEOUT_MS = 500
