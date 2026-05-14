@@ -9,7 +9,7 @@ STOP_BITS_OPTIONS = ["1", "2"]
 
 class TransportWidget(ttk.LabelFrame):
     IS_APP_WIDGET = True
-    PANEL_TITLE = "Настройка COM-порта"
+    PANEL_TITLE = "1.Настройка COM-порта"
 
     def __init__(self, parent, client, poller=None, on_log=None):
         super().__init__(parent, text=self.PANEL_TITLE, style="Card.TLabelframe")
