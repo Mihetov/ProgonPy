@@ -110,7 +110,7 @@ class MainWindow:
         ttk.Label(self.left, text="Выбери виджет слева", style="Muted.TLabel").pack(anchor="w", padx=12, pady=(0, 12))
 
         self.sidebar_menu = tk.Menu(self.root, tearoff=0)
-        self.sidebar_menu.add_command(label="Настройка программы", command=self._open_program_settings)
+        #self.sidebar_menu.add_command(label="Настройка программы", command=self._open_program_settings)
         self.sidebar_menu.add_command(label="О программе", command=self._open_about)
 
         self.nav_container = ttk.Frame(self.left, style="Sidebar.TFrame")
@@ -145,13 +145,10 @@ class MainWindow:
         container = ttk.Frame(win, style="App.TFrame")
         container.pack(fill="both", expand=True, padx=14, pady=14)
 
-        ttk.Label(container, text="Промышленная конфигурация", style="SidebarTitle.TLabel").pack(anchor="w", pady=(0, 10))
+        ttk.Label(container, text="Test", style="SidebarTitle.TLabel").pack(anchor="w", pady=(0, 10))
 
         sections = [
-            ("Связь и надежность", ["Таймаут RPC (мс)", "Количество повторов", "Пауза между попытками (мс)"]),
-            ("Опрос и производительность", ["Интервал опроса по умолчанию (мс)", "Максимум регистров за запрос", "Лимит параллельных задач"]),
-            ("Журналирование и аудит", ["Уровень логирования", "Ротация логов (дни)", "Экспорт диагностики"]),
-            ("Безопасность и доступ", ["Требовать подтверждение на запись", "Защита критических адресов", "Роли оператор/инженер"]),
+            ("TEST", ["TEST", "TEST", "TEST"])
         ]
 
         for title, fields in sections:
@@ -177,7 +174,9 @@ class MainWindow:
         body = ttk.Frame(card, style="Panel.TFrame")
         body.pack(fill="both", expand=True)
 
-        ttk.Label(body, text="Desktop GUI для Modbus/JSON-RPC интеграции", style="App.TLabel").pack(anchor="w", pady=(4, 8))
+        ttk.Label(body, text="Модульная надстройка над сервером modbus", style="App.TLabel").pack(anchor="w", pady=(4, 8))
+        ttk.Label(body, text="Включенно в сборку: Подключение COM, изменение данных регистров", style="App.TLabel").pack(anchor="w", pady=(4, 8))
+        ttk.Label(body, text="из csv файла, прогон для индикаторов 3 видов(обычный, спецсимвол, шкала)", style="App.TLabel").pack(anchor="w", pady=(4, 8))
         ttk.Label(body, text=f"Версия сборки: {build_version}", style="App.TLabel").pack(anchor="w", pady=4)
         ttk.Label(body, text="Принцип версии: дата сборки (YYYY.MM.DD)", style="App.TLabel").pack(anchor="w", pady=4)
 

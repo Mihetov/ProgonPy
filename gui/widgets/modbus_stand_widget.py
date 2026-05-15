@@ -1,9 +1,4 @@
 # -*- coding: utf-8 -*-
-"""
-Модуль тестирования устройств (режим стенда)
-Архитектура: Model-View, BackendClient, асинхронные операции
-"""
-
 import time
 import tkinter as tk
 from tkinter import ttk, messagebox
@@ -23,10 +18,10 @@ class DiscoveredDevice:
     def __init__(self, address: int, device_type: DeviceType = DeviceType.NORMAL, basis: int = 4):
         self.address = address
         self.device_type = device_type
-        self.basis = basis  # 🔹 Количество ячеек индикатора (из регистра 0xF004)
+        self.basis = basis  
         self.name = f"Устройство #{address} ({device_type.name}, {basis} ячейки)"
-        self.last_sent: str = ""      # Последнее отправленное значение
-        self.last_received: str = ""  # Последний ответ от устройства
+        self.last_sent: str = ""      
+        self.last_received: str = "" 
         self.error_count: int = 0 
     
     def __repr__(self):
@@ -83,15 +78,9 @@ class DeviceTestWidget(ttk.LabelFrame):
         self._build()
         self.after(300, self._check_transport)
 
-    # =========================================================
-    # UI BUILD
-    # =========================================================
-
     def _build(self):
         body = ttk.Frame(self, style="Panel.TFrame")
         body.pack(fill="both", expand=True, padx=8, pady=8)
-
-        # ----------------- CONNECTION STATUS -----------------
         conn_frame = ttk.Frame(body)
         conn_frame.pack(fill="x", pady=(0, 8))
 
@@ -109,7 +98,7 @@ class DeviceTestWidget(ttk.LabelFrame):
             style="Secondary.TButton"
         ).pack(side="right")
 
-        # ----------------- SCAN SETTINGS -----------------
+
         scan_frame = ttk.LabelFrame(body, text="Сканирование")
         scan_frame.pack(fill="x", pady=(0, 8))
 
@@ -126,7 +115,6 @@ class DeviceTestWidget(ttk.LabelFrame):
             style="Primary.TButton"
         ).grid(row=0, column=4, padx=(20, 8))
 
-        # ----------------- DEVICE LIST -----------------
         list_frame = ttk.LabelFrame(body, text="Найденные устройства")
         list_frame.pack(fill="both", expand=True, pady=(0, 8))
 
@@ -147,10 +135,8 @@ class DeviceTestWidget(ttk.LabelFrame):
         self.tree.column("type", width=120, anchor="center")
         self.tree.column("name", width=200)
 
-        # Контекстное меню для удаления
         self._bind_context_menu()
 
-        # ----------------- TEST CONTROLS -----------------
         test_frame = ttk.Frame(body)
         test_frame.pack(fill="x", pady=(0, 8))
 
@@ -198,12 +184,8 @@ class DeviceTestWidget(ttk.LabelFrame):
         self.tree.bind("<Button-3>", show_menu)
         self.tree.bind("<Delete>", lambda e: self._remove_selected())
 
-    # =========================================================
-    # TRANSPORT & LOGGING
-    # =========================================================
-
     def _check_transport(self):
-        """Проверка статуса транспорта"""
+
         try:
             resp = self.client.transport_status()
             result = resp.get("result", {})
@@ -219,7 +201,7 @@ class DeviceTestWidget(ttk.LabelFrame):
             self._log(f"Transport check error: {e}")
 
     def _update_status_display(self, result: dict):
-        """Обновление отображения статуса"""
+
         if not self.transport_online:
             self.status_label.config(text="Transport: DISCONNECTED", style="Offline.TLabel")
             self.test_btn.config(state="disabled")
@@ -234,11 +216,10 @@ class DeviceTestWidget(ttk.LabelFrame):
             text = f"✓ {conn_type}: connected"
         
         self.status_label.config(text=text, style="Online.TLabel")
-        # Кнопка теста активна, если есть устройства
         self.test_btn.config(state="normal" if self.devices else "disabled")
 
     def _log(self, message: str):
-        """Добавление сообщения в лог"""
+
         timestamp = time.strftime("%H:%M:%S")
         self.log_text.config(state="normal")
         self.log_text.insert("end", f"[{timestamp}] {message}\n")
@@ -249,17 +230,12 @@ class DeviceTestWidget(ttk.LabelFrame):
             self.on_log(f"[DeviceTest] {message}")
 
     def _notify(self, message: str, is_error: bool = False):
-        """Уведомление пользователя"""
+
         self._log(message)
         if is_error:
             messagebox.showerror(self.PANEL_TITLE, message)
 
-    # =========================================================
-    # DEVICE LIST MANAGEMENT
-    # =========================================================
-
     def _clear_devices(self):
-        """Очистка списка устройств"""
         if self._test_active:
             self._toggle_test()  # Остановить тест если идёт
         
@@ -270,19 +246,16 @@ class DeviceTestWidget(ttk.LabelFrame):
         self.test_btn.config(state="disabled")
 
     def _remove_selected(self):
-        """Удаление выбранных устройств"""
         selected = self.tree.selection()
         if not selected:
             return
         
-        # Собираем индексы для удаления (в обратном порядке)
         indices = sorted([int(iid) for iid in selected], reverse=True)
         for idx in indices:
             if 0 <= idx < len(self.devices):
                 self.devices.pop(idx)
             self.tree.delete(str(idx))
         
-        # Перестроить iid после удаления
         self._refresh_device_list()
         self._log(f"Удалено устройств: {len(indices)}")
         self.test_btn.config(state="normal" if self.devices else "disabled")
@@ -297,8 +270,7 @@ class DeviceTestWidget(ttk.LabelFrame):
                 DeviceType.SPECIAL: "Со спецсимволами",
                 DeviceType.SLIDER: "Со слайдером"
             }
-            # 🔹 Показываем basis в описании
-            basis_text = f"{dev.basis}яч" if dev.basis != 4 else ""  # не показываем если стандарт
+            basis_text = f"{dev.basis}яч" if dev.basis != 4 else ""  
             name_suffix = f" [{basis_text}]" if basis_text else ""
             self.tree.insert("", "end", iid=str(idx), values=(
                 f"0x{dev.address:04X}",
@@ -306,13 +278,7 @@ class DeviceTestWidget(ttk.LabelFrame):
                 f"{dev.name}{name_suffix}"
             ))
     def _cells_to_registers(self, cells: List[int]) -> List[int]:
-        """
-        Конвертация списка значений ячеек (0-255) в список 16-битных регистров
-        :param cells: [cell0, cell1, ..., cellN] где каждый 0-255
-        :return: [reg0, reg1, ...] для записи последовательно начиная с REG_SEGMENTS
-        """
         regs = []
-        # Каждая пара ячеек → один регистр (старший байт = чётная ячейка, младший = нечётная)
         for i in range(0, len(cells), 2):
             high = cells[i] if i < len(cells) else 0
             low = cells[i+1] if i+1 < len(cells) else 0
@@ -320,12 +286,6 @@ class DeviceTestWidget(ttk.LabelFrame):
             regs.append(reg)
         return regs
     def _registers_to_cells(self, regs: List[int], basis: int) -> List[int]:
-        """
-        Обратная конвертация: регистры → список ячеек
-        :param regs: список 16-битных значений
-        :param basis: сколько ячеек нужно извлечь
-        :return: список из basis значений 0-255
-        """
         cells = []
         for reg in regs:
             cells.append((reg >> 8) & 0xFF)  # старший байт
@@ -334,23 +294,12 @@ class DeviceTestWidget(ttk.LabelFrame):
                 break
         return cells[:basis]
     def _encode_cells_basis(self, cells: List[int], basis: int) -> tuple:
-        """
-        Кодирование списка ячеек в два 16-битных регистра с учётом basis
-        :param cells: список значений ячеек (0-255)
-        :param basis: количество значимых ячеек (1-8)
-        :return: (reg1, reg2)
-        """
-        # Дополняем до 4 ячеек нулями для совместимости с 2 регистрами
         while len(cells) < 4:
             cells.append(0)
-        # Берём только первые 4 для кодирования в 2 регистра
         return self._encode_four_numbers(cells[0], cells[1], cells[2], cells[3])
 
     def _blink_device(self, address: int, duration_ms: int = 3000, interval_ms: int = 300, basis: int = 4):
-        """Мигание с учётом количества ячеек"""
         blink_state = {"active": True, "on": True}
-        
-        # 🔹 Предварительно кодируем "включено" и "выключено"
         cells_on = [0xFF] * basis  # все сегменты включены
         regs_on = self._cells_to_registers(cells_on)
         regs_off = [0] * ((basis + 1) // 2)  # все выключено
@@ -363,7 +312,6 @@ class DeviceTestWidget(ttk.LabelFrame):
         
         def _blink_step():
             if not blink_state["active"]:
-                # Финальный сброс
                 for i in range((basis + 1) // 2):
                     self.client.write(slave=address, address=self.REG_SEGMENTS + i, value=0)
                 return
@@ -377,8 +325,6 @@ class DeviceTestWidget(ttk.LabelFrame):
             blink_state["active"] = False
         return _stop
     def _add_device_with_dialog(self, address: int) -> bool:
-        """Диалог выбора типа устройства с миганием для идентификации"""
-        # Проверка: не добавлено ли уже
         if any(d.address == address for d in self.devices):
             self._log(f"Устройство 0x{address:04X} уже в списке")
             return False
@@ -394,23 +340,18 @@ class DeviceTestWidget(ttk.LabelFrame):
                     self._log(f"  ⚠ O-basis={values[0]} вне диапазона 1-{self.MAX_BASIS}, используем 4")
         except Exception as e:
             self._log(f"  ⚠ Не удалось прочитать O-basis: {e}")
-        # 🔹 Запускаем мигание для визуальной идентификации
         stop_blink = self._blink_device(address, duration_ms=5000, basis=basis)
         
-        # Диалог выбора типа
         dialog = tk.Toplevel(self)
         dialog.title(f"Устройство 0x{address:04X}")
         dialog.transient(self)
         dialog.grab_set()
         dialog.resizable(False, False)
-        
-        # Центрирование
         dialog.update_idletasks()
         x = self.winfo_rootx() + self.winfo_width()//2 - 150
         y = self.winfo_rooty() + self.winfo_height()//2 - 100
         dialog.geometry(f"320x220+{x}+{y}")
         
-        # Заголовок с подсказкой
         ttk.Label(dialog, text=f"Адрес: 0x{address:04X}", font=("Segoe UI", 10, "bold")).pack(pady=(15, 5))
         ttk.Label(dialog, text="⚡ Устройство должно мигать ⚡", foreground="#FF6B00").pack(pady=(0, 10))
         ttk.Label(dialog, text="Выберите тип устройства:").pack()
@@ -428,8 +369,7 @@ class DeviceTestWidget(ttk.LabelFrame):
         result = {"selected": None}
         
         def _cleanup_and_close():
-            """Общая функция закрытия: останавливаем мигание + закрываем диалог"""
-            stop_blink()  # ✅ Останавливаем мигание
+            stop_blink()
             dialog.destroy()
         
         def on_ok():
@@ -440,19 +380,12 @@ class DeviceTestWidget(ttk.LabelFrame):
             result["selected"] = None
             _cleanup_and_close()
         
-        # Кнопки
         btn_frame = ttk.Frame(dialog)
         btn_frame.pack(pady=20)
         ttk.Button(btn_frame, text="OK", command=on_ok, style="Primary.TButton", width=10).pack(side="left", padx=10)
         ttk.Button(btn_frame, text="Отмена", command=on_cancel, width=10).pack(side="left", padx=10)
-        
-        # 🔹 Гарантированная остановка мигания при любом закрытии диалога
         dialog.protocol("WM_DELETE_WINDOW", _cleanup_and_close)
-        
-        # Ожидание ответа (блокирующее, но мигание работает через after)
         dialog.wait_window()
-        
-        # 🔹 Дополнительная страховка: если диалог закрыт, но мигание ещё идёт
         stop_blink()
         
         if result["selected"]:
@@ -466,19 +399,12 @@ class DeviceTestWidget(ttk.LabelFrame):
             self._log(f"✗ Пропущено устройство 0x{address:04X}")
             return False
 
-    # =========================================================
-    # SCANNING
-    # =========================================================
-
     def _start_scan(self):
-        """Запуск сканирования"""
         if not self.transport_online:
             self._notify("Transport not connected", is_error=True)
             return
         
-        # Очистка перед новым сканированием
         self._clear_devices()
-        
         start = self.scan_start.get()
         end = self.scan_end.get()
         
@@ -490,7 +416,7 @@ class DeviceTestWidget(ttk.LabelFrame):
         self._scan_next(start, end)
 
     def _scan_next(self, current: int, end: int):
-        """Рекурсивное сканирование следующего адреса"""
+
         if current > end:
             self._log(f"Сканирование завершено. Найдено: {len(self.devices)}")
             return
@@ -512,29 +438,21 @@ class DeviceTestWidget(ttk.LabelFrame):
             
             if values and values[0] == address:
                 self._log(f"✓ Ответ от 0x{address:04X}")
-                # Диалог добавления (блокирующий)
                 self._add_device_with_dialog(address)
             else:
                 self._log(f"✗ Нет ответа или неверный ответ от 0x{address:04X}")
         else:
             self._log(f"✗ Ошибка запроса к 0x{address:04X}: {resp.get('error')}")
         
-        # Следующий адрес с задержкой
         self.after(50, lambda: self._scan_next(current + 1, end))
 
-    # =========================================================
-    # STAND MODE TEST
-    # =========================================================
-
     def _toggle_test(self):
-        """Старт/стоп теста"""
         if self._test_active:
             self._stop_test()
         else:
             self._start_test()
 
     def _start_test(self):
-        """Запуск режима стенда"""
         if not self.devices:
             self._notify("Нет устройств для теста", is_error=True)
             return
@@ -547,42 +465,31 @@ class DeviceTestWidget(ttk.LabelFrame):
         self._current_color = 0
         self.test_btn.config(text="⏹ Остановить тест", style="Danger.TButton")
         self._log("=== ЗАПУСК РЕЖИМА СТЕНДА ===")
-        
-        # Запуск первого шага теста
         self._test_step()
 
     def _stop_test(self):
-        """Остановка теста"""
         self._test_active = False
         self.test_btn.config(text="▶ Начать тест", style="Success.TButton")
         self._log("Тест остановлен пользователем")
-        
-        # Сброс индикаторов на всех устройствах
         self._reset_all_devices()
 
     def _reset_all_devices(self):
-        """Сброс всех индикаторов после остановки"""
         for dev in self.devices:
             try:
-                # 🔹 Вычисляем сколько регистров нужно очистить
                 num_regs = (dev.basis + 1) // 2
                 for i in range(num_regs):
                     self.client.write(slave=dev.address, address=self.REG_SEGMENTS + i, value=0)
-                # Спецсимволы
                 if dev.device_type in (DeviceType.SPECIAL, DeviceType.SLIDER):
                     self.client.write(slave=dev.address, address=self.REG_SPECIAL, value=0)
-                # Слайдер
                 if dev.device_type == DeviceType.SLIDER:
                     self._write_float(dev.address, self.REG_SLIDER, 0.0)
             except:
                 pass
 
     def _test_step(self):
-        """Один шаг цикла теста (вызывается рекурсивно через after)"""
         if not self._test_active:
             return
         
-        # === ЦИКЛ ТЕСТА ===
         if self._test_cycle == 0:
             # Шаг 0: Смена цвета
             self._set_color_all(self._current_color)
@@ -654,34 +561,24 @@ class DeviceTestWidget(ttk.LabelFrame):
                 self._next_cycle()
 
     def _after_step(self, next_step: int):
-        """Переход к следующему шагу с задержкой"""
         self._test_cycle = next_step
         self.after(self._step_delay_ms * 10, self._test_step)  # Небольшая пауза между шагами
 
     def _next_cycle(self):
-        """Завершение цикла и переход к следующему"""
         self._test_cycle = 0
         self._current_color = 1 - self._current_color  # Переключение цвета
         self.cycle_label.config(text=f"Цикл: {self._test_cycle + 1}")
         self._log(f"✓ Цикл завершён. Пауза {self._cycle_delay_ms}мс...")
         self.after(self._cycle_delay_ms, self._test_step)
 
-    # =========================================================
-    # TEST PRIMITIVES
-    # =========================================================
-
     def _set_color_all(self, color: int):
-        """Установить цвет подсветки на всех устройствах"""
         for dev in self.devices:
             self.client.write(slave=dev.address, address=self.REG_COLOR, value=color)
 
     def _test_segments_all(self, direction: str, callback: Callable):
-        """Запуск теста сегментов с динамическим basis"""
         if not self.devices:
             callback()
             return
-        
-        # 🔹 Находим максимальный basis для синхронизации шагов
         max_basis = max(dev.basis for dev in self.devices)
         
         if direction == "up":
@@ -692,7 +589,6 @@ class DeviceTestWidget(ttk.LabelFrame):
             self._segments_step_down(max_basis - 1, 7, max_basis, callback)
 
     def _segments_step_up(self, cell: int, segment: int, max_basis: int, callback: Callable):
-        """Включение сегментов с учётом basis каждого устройства"""
         if cell >= max_basis:
             callback()
             return
@@ -701,15 +597,11 @@ class DeviceTestWidget(ttk.LabelFrame):
             return
 
         for dev in self.devices:
-            # 🔹 Формируем ячейки под basis устройства
             cells = [0] * dev.basis
-            # Предыдущие ячейки: полностью включены
             for prev in range(min(cell, dev.basis)):
                 cells[prev] = 0xFF
-            # Текущая ячейка: включаем сегменты 0..segment
             if cell < dev.basis:
                 cells[cell] = (1 << (segment + 1)) - 1
-            # Кодируем в регистры и пишем
             regs = self._cells_to_registers(cells)
             for i, reg_val in enumerate(regs):
                 self.client.write(slave=dev.address, address=self.REG_SEGMENTS + i, value=reg_val)
@@ -717,7 +609,6 @@ class DeviceTestWidget(ttk.LabelFrame):
         self.after(self._step_delay_ms, lambda: self._segments_step_up(cell, segment + 1, max_basis, callback))
 
     def _segments_step_down(self, cell: int, segment: int, max_basis: int, callback: Callable):
-        """Выключение сегментов (обратный порядок)"""
         if cell < 0:
             callback()
             return
@@ -738,48 +629,32 @@ class DeviceTestWidget(ttk.LabelFrame):
         self.after(self._step_delay_ms, lambda: self._segments_step_down(cell, segment - 1, max_basis, callback))
 
     def _segments_step(self, cell: int, segment: int, num_cells: int, direction: str, callback: Callable):
-        """Рекурсивный шаг теста сегментов"""
+
         if cell >= num_cells:
             callback()
             return
         
         if segment >= 8:
-            # Переход к следующей ячейке
             self._segments_step(cell + 1, 0, num_cells, direction, callback)
             return
         
-        # Формирование маски
         all_cells = [0] * num_cells
-        
-        # Предыдущие ячейки: все сегменты включены
         for prev in range(cell):
             all_cells[prev] = 0xFF
         
-        # Текущая ячейка
         if direction == "up":
             mask = (1 << (segment + 1)) - 1  # Включаем от 0 до segment
         else:
             mask = (1 << segment) - 1  # Включаем от 0 до segment-1 (выключаем segment)
         all_cells[cell] = mask
-        
-        # Запись на все устройства
         reg1, reg2 = self._encode_four_numbers(*all_cells)
         for dev in self.devices:
             self.client.write(slave=dev.address, address=self.REG_SEGMENTS, value=reg1)
             self.client.write(slave=dev.address, address=self.REG_SEGMENTS + 1, value=reg2)
-        
-        # Следующий сегмент
         self.after(self._step_delay_ms, 
                   lambda: self._segments_step(cell, segment + 1, num_cells, direction, callback))
 
     def _test_special_symbols(self, devices: List[DiscoveredDevice], direction: str, callback: Callable):
-        """
-        Тест специальных символов (накопительное включение/выключение)
-        :param devices: список устройств типа SPECIAL
-        :param direction: "on" или "off"
-        :param callback: по завершении
-        """
-        # Битовые маски сегментов спец. знака
         segments = [
             (0x0400, 'a'), (0x0800, 'b'), (0x0100, 'c'), (0x0200, 'd'),
             (0x4000, 'e'), (0x8000, 'f'), (0x1000, 'g'), (0x2000, 'h'),
@@ -789,7 +664,6 @@ class DeviceTestWidget(ttk.LabelFrame):
         if direction == "on":
             self._special_step_on(devices, segments, 0, 0, callback)
         else:
-            # Начинаем с полной маски
             full_mask = sum(mask for mask, _ in segments)
             self._special_step_off(devices, list(reversed(segments)), 0, full_mask, callback)
 
@@ -810,7 +684,6 @@ class DeviceTestWidget(ttk.LabelFrame):
 
     def _special_step_off(self, devices, segments, idx: int, accumulated: int, callback: Callable):
         if idx >= len(segments):
-            # Финальный сброс
             for dev in devices:
                 self.client.write(slave=dev.address, address=self.REG_SPECIAL, value=0)
             callback()
@@ -827,9 +700,6 @@ class DeviceTestWidget(ttk.LabelFrame):
                   lambda: self._special_step_off(devices, segments, idx + 1, accumulated, callback))
 
     def _test_slider_parallel(self, devices: List[DiscoveredDevice], direction: str, callback: Callable):
-        """
-        Параллельный тест слайдера (плавное изменение 1→100 или 100→1)
-        """
         values = range(1, 101) if direction == "up" else range(100, 0, -1)
         self._slider_step(devices, list(values), 0, callback)
 
@@ -849,9 +719,6 @@ class DeviceTestWidget(ttk.LabelFrame):
                   lambda: self._slider_step(devices, values, idx + 1, callback))
 
     def _test_scale_parallel(self, devices: List[DiscoveredDevice], direction: str, callback: Callable):
-        """
-        Параллельный тест шкалы (64 бита, 4 регистра)
-        """
         total_bits = 64
         if direction == "on":
             self._scale_step_on(devices, 0, total_bits, callback)
@@ -872,7 +739,6 @@ class DeviceTestWidget(ttk.LabelFrame):
 
     def _scale_step_off(self, devices, bit: int, mask: int, callback: Callable):
         if bit < 0:
-            # Финальный сброс
             for dev in devices:
                 self.client.write(slave=dev.address, address=self.REG_SCALE_BASE, value=0)
                 self.client.write(slave=dev.address, address=self.REG_SCALE_BASE + 1, value=0)
@@ -888,7 +754,6 @@ class DeviceTestWidget(ttk.LabelFrame):
                   lambda: self._scale_step_off(devices, bit - 1, mask, callback))
 
     def _write_scale_mask(self, devices: List[DiscoveredDevice], mask: int):
-        """Запись 64-битной маски шкалы (4 регистра)"""
         regs = [
             self._swap_endian16((mask >> 0) & 0xFFFF),
             self._swap_endian16((mask >> 16) & 0xFFFF),
@@ -897,11 +762,6 @@ class DeviceTestWidget(ttk.LabelFrame):
         ]
         for dev in devices:
             self.client.write(slave=dev.address, address=self.REG_SCALE_BASE, values=regs)
-
-    # =========================================================
-    # CODECS
-    # =========================================================
-
     def _float_to_registers(self, fval: float) -> tuple:
         """Float32 → два 16-битных регистра (Big-Endian)"""
         import struct
@@ -919,13 +779,7 @@ class DeviceTestWidget(ttk.LabelFrame):
     def _swap_endian16(self, val: int) -> int:
         """Swap byte order для 16-битного значения"""
         return ((val & 0xFF) << 8) | ((val >> 8) & 0xFF)
-
-    # =========================================================
-    # CLEANUP
-    # =========================================================
-
     def destroy(self):
-        """Очистка при закрытии виджета"""
         if self._test_active:
             self._stop_test()
         super().destroy()

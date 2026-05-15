@@ -16,10 +16,6 @@ class BackendState(Enum):
     READY = "READY"
     ERROR = "ERROR"
 
-# =========================================================
-# RPC TASK
-# =========================================================
-
 class RpcTask:
     def __init__(
         self,
@@ -35,16 +31,7 @@ class RpcTask:
         self.response = None
         self.error = None
 
-
-# =========================================================
-# BACKEND CLIENT
-# =========================================================
-
 class BackendClient:
-
-    # =====================================================
-    # INIT
-    # =====================================================
 
     def __init__(
         self,
@@ -63,11 +50,6 @@ class BackendClient:
         self.transport_active = False
         self.log = logger or logging.getLogger("BackendClient")
         self._lock = threading.Lock()
-
-        # =================================================
-        # RPC QUEUE
-        # =================================================
-
         self.rpc_queue = queue.Queue()
         self.worker_running = True
         self.worker = threading.Thread(
@@ -77,10 +59,6 @@ class BackendClient:
 
         self.worker.start()
 
-    # =====================================================
-    # URL
-    # =====================================================
-
     def _build_url(self):
         return f"http://{self.host}:{self.port}"
 
@@ -89,10 +67,6 @@ class BackendClient:
         with self._lock:
             self.port = port
             self.url = self._build_url()
-
-    # =====================================================
-    # RPC WORKER
-    # =====================================================
 
     def _rpc_worker(self):
         session = requests.Session()
@@ -114,8 +88,6 @@ class BackendClient:
                 response = session.post(
                     self.url,
                     json=payload,
-
-                    # connect timeout, read timeout
                     timeout=(
                         min(task.timeout, 0.2),
                         task.timeout
@@ -137,10 +109,6 @@ class BackendClient:
             finally:
 
                 task.done.set()
-
-    # =====================================================
-    # RPC CALL
-    # =====================================================
 
     def _rpc(
         self,
@@ -168,10 +136,6 @@ class BackendClient:
                 "error": task.error
             }
         return task.response
-
-    # =====================================================
-    # SERVER CONTROL
-    # =====================================================
 
     def start_server(self, args=None):
         args = args or []
@@ -222,10 +186,6 @@ class BackendClient:
             self.state = BackendState.STOPPED
             self.transport_active = False
 
-    # =====================================================
-    # STATUS
-    # =====================================================
-
     def is_ready(self):
         return self.state == BackendState.READY
 
@@ -234,10 +194,6 @@ class BackendClient:
             "ping",
             timeout=0.3
         )
-
-    # =====================================================
-    # TRANSPORT
-    # =====================================================
 
     def serial_ports(self):
 
@@ -265,10 +221,6 @@ class BackendClient:
 
         return resp
 
-    # =====================================================
-    # OPEN RTU
-    # =====================================================
-
     def open_rtu(
         self,
         port: str,
@@ -294,10 +246,6 @@ class BackendClient:
 
         return resp
 
-    # =====================================================
-    # OPEN TCP
-    # =====================================================
-
     def open_tcp(
         self,
         host: str,
@@ -318,10 +266,6 @@ class BackendClient:
             self.transport_active = True
 
         return resp
-
-    # =====================================================
-    # SWITCH RTU
-    # =====================================================
 
     def switch_transport_rtu(
         self,
@@ -346,10 +290,6 @@ class BackendClient:
 
         return resp
 
-    # =====================================================
-    # SWITCH TCP
-    # =====================================================
-
     def switch_transport_tcp(
         self,
         host: str,
@@ -370,10 +310,6 @@ class BackendClient:
             self.transport_active = True
 
         return resp
-
-    # =====================================================
-    # MODBUS READ
-    # =====================================================
 
     def read(
         self,
@@ -411,10 +347,6 @@ class BackendClient:
             timeout=timeout_sec
         )
 
-    # =====================================================
-    # MODBUS GROUP READ
-    # =====================================================
-
     def read_group(
         self,
         requests_list: List[Dict[str, Any]],
@@ -444,10 +376,6 @@ class BackendClient:
             },
             timeout=timeout_sec
         )
-
-    # =====================================================
-    # MODBUS WRITE
-    # =====================================================
 
     def write(
         self,
@@ -496,10 +424,6 @@ class BackendClient:
             timeout=0.5
         )
 
-    # =====================================================
-    # MODBUS GROUP WRITE
-    # =====================================================
-
     def write_group(
         self,
         requests_list: List[Dict[str, Any]]
@@ -523,10 +447,6 @@ class BackendClient:
             timeout=1.0
         )
 
-    # =====================================================
-    # WAIT READY
-    # =====================================================
-
     def wait_ready(
         self,
         timeout: float = 20.0,
@@ -543,10 +463,6 @@ class BackendClient:
             time.sleep(poll_interval)
 
         return False
-
-    # =====================================================
-    # CONTEXT MANAGER
-    # =====================================================
 
     def __enter__(self):
 

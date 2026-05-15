@@ -47,10 +47,8 @@ def run() -> None:
         "--add-data", f"Server.exe{separator}.",
     ])
     
-    # Основной скрипт
     cmd.append(str(root / "main.py"))
     
-    # Добавляем иконку если есть
     icon_path = root / "icon.ico"
     if icon_path.exists():
         cmd.extend(["--icon", str(icon_path)])
@@ -64,8 +62,7 @@ def run() -> None:
     except subprocess.CalledProcessError as e:
         print(f"\nError during build: {e}")
         sys.exit(1)
-    
-    # После сборки копируем необходимые файлы вручную
+
     print("\n" + "="*80)
     print("Copying additional files to distribution...")
     
@@ -98,14 +95,12 @@ def run() -> None:
     print("\n✅ Build completed successfully!")
     print(f"📁 Executable folder: {exe_dir}")
     print(f"🚀 Run: {exe_dir / 'ProgonPy.exe'}")
-    
-    # Показываем содержимое папки для проверки
     print("\n📋 Distribution contents:")
     for item in sorted(exe_dir.iterdir()):
         if item.is_dir():
             print(f"   📁 {item.name}/")
         else:
-            size = item.stat().st_size / 1024 / 1024  # В МБ
+            size = item.stat().st_size / 1024 / 1024
             print(f"   📄 {item.name} ({size:.2f} MB)")
 
 

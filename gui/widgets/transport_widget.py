@@ -9,8 +9,6 @@ STOP_BITS_OPTIONS = ["1", "2"]
 
 
 class TransportWidget(ttk.LabelFrame):
-    """Виджет настройки и управления транспортным соединением"""
-    
     IS_APP_WIDGET = True
     PANEL_TITLE = "1. Настройка COM-порта"
 
@@ -28,33 +26,22 @@ class TransportWidget(ttk.LabelFrame):
         self.client = client
         self.poller = poller
         self.on_log = on_log
-
-        # Настройки подключения
         self.port = tk.StringVar(value="")
         self.baud = tk.StringVar(value="115200")
         self.parity = tk.StringVar(value="none")
         self.stop_bits = tk.StringVar(value="1")
-
-        # Состояние
         self._connection_state = "disconnected"
         self._last_status_info = {}
         self._status_poll_active = False
         self._status_poll_interval = 2000
-
         self._build()
         self._update_ui_state()
         self.after(500, self.refresh_ports)
         self.after(1000, self._start_status_poll)
 
-    # =========================================================
-    # UI BUILD (Тёмная тема)
-    # =========================================================
-
     def _build(self):
         body = ttk.Frame(self, style="Panel.TFrame")
         body.pack(fill="x", padx=8, pady=8)
-
-        # ----------------- STATUS INDICATOR -----------------
         status_frame = ttk.Frame(body, style="Panel.TFrame")
         status_frame.pack(fill="x", pady=(0, 12))
 
@@ -74,7 +61,7 @@ class TransportWidget(ttk.LabelFrame):
         )
         self.status_detail.pack(side="right")
 
-        # ----------------- PORT SETTINGS -----------------
+
         settings_frame = ttk.LabelFrame(body, text="Параметры подключения", style="Card.TLabelframe")
         settings_frame.pack(fill="x", pady=(0, 8))
 
@@ -113,7 +100,6 @@ class TransportWidget(ttk.LabelFrame):
             state="readonly", style="App.TCombobox", width=5
         ).pack(side="left", padx=(4, 0))
 
-        # ----------------- ACTION BUTTONS -----------------
         btn_frame = ttk.Frame(body, style="Panel.TFrame")
         btn_frame.pack(fill="x", pady=(8, 4))
 
@@ -127,7 +113,6 @@ class TransportWidget(ttk.LabelFrame):
         )
         self.disconnect_btn.pack(side="left", fill="x", expand=True, padx=(4, 0))
 
-        # ----------------- TEST CONNECTION -----------------
         test_frame = ttk.Frame(body, style="Panel.TFrame")
         test_frame.pack(fill="x", pady=(8, 4))
 
@@ -137,7 +122,6 @@ class TransportWidget(ttk.LabelFrame):
         )
         self.test_btn.pack(fill="x")
 
-        # ----------------- ACTIVE CONNECTION INFO -----------------
         self.info_frame = ttk.LabelFrame(body, text="Активное подключение", style="Card.TLabelframe")
         self.info_frame.pack(fill="x", pady=(12, 0))
         self.info_frame.pack_forget()
@@ -149,7 +133,6 @@ class TransportWidget(ttk.LabelFrame):
         )
         self.info_text.pack(fill="x", padx=4, pady=4)
 
-        # ----------------- LOG AREA -----------------
         log_frame = ttk.LabelFrame(body, text="События", style="Card.TLabelframe")
         log_frame.pack(fill="x", pady=(12, 0))
 
@@ -161,10 +144,6 @@ class TransportWidget(ttk.LabelFrame):
         self.log_text.pack(fill="x", padx=4, pady=4)
 
         body.columnconfigure(0, weight=1)
-
-    # =========================================================
-    # STATUS INDICATOR & UI STATE
-    # =========================================================
 
     def _draw_status_indicator(self):
         """Рисует цветной индикатор статуса"""
@@ -192,8 +171,7 @@ class TransportWidget(ttk.LabelFrame):
         self.status_detail.config(text=detail)
         
         self._draw_status_indicator()
-        
-        # Управление кнопками
+
         if state == "connected":
             self.connect_btn.config(state="disabled")
             self.disconnect_btn.config(state="normal")
@@ -223,10 +201,6 @@ class TransportWidget(ttk.LabelFrame):
             return f"{info.get('host')}:{info.get('port')}"
         return conn_type
 
-    # =========================================================
-    # STATUS POLLING (ИСПРАВЛЕНО)
-    # =========================================================
-
     def _start_status_poll(self):
         if self._status_poll_active:
             return
@@ -247,7 +221,6 @@ class TransportWidget(ttk.LabelFrame):
                 result = resp.get("result", {})
                 is_active = bool(result.get("active"))
                 
-                # 🔹 ЖЕСТКАЯ СИНХРОНИЗАЦИЯ С СЕРВЕРОМ
                 if is_active:
                     if self._connection_state != "connected":
                         self._connection_state = "connected"
@@ -255,7 +228,6 @@ class TransportWidget(ttk.LabelFrame):
                         self._log_event("✓ Транспорт подключён", "success")
                         self._update_info_panel(result)
                 else:
-                    # Если сервер говорит "не активен", мы ПРИНУДИТЕЛЬНО сбрасываем состояние
                     if self._connection_state != "disconnected":
                         self._connection_state = "disconnected"
                         self._last_status_info = {}
@@ -264,7 +236,6 @@ class TransportWidget(ttk.LabelFrame):
                         self.info_text.delete("1.0", "end")
                         self.info_text.config(state="disabled")
             else:
-                # Ошибка запроса статуса
                 if self._connection_state == "connected":
                     self._connection_state = "error"
                     self._last_status_info["error"] = resp.get("error", "unknown")
@@ -298,10 +269,6 @@ class TransportWidget(ttk.LabelFrame):
         self.info_text.insert("end", "\n".join(lines))
         self.info_text.config(state="disabled")
 
-    # =========================================================
-    # LOGGING
-    # =========================================================
-
     def _log_event(self, message: str, level: str = "info"):
         timestamp = time.strftime("%H:%M:%S")
         colors = {
@@ -328,10 +295,6 @@ class TransportWidget(ttk.LabelFrame):
         if is_error:
             messagebox.showerror("Transport Error", msg)
 
-    # =========================================================
-    # PORT MANAGEMENT
-    # =========================================================
-
     def refresh_ports(self):
         self._log_event("🔄 Поиск портов...")
         
@@ -355,10 +318,6 @@ class TransportWidget(ttk.LabelFrame):
         else:
             self.port.set("")
             self._log_event("⚠ Порты не найдены", "warning")
-
-    # =========================================================
-    # CONNECTION CONTROL (ИСПРАВЛЕНО)
-    # =========================================================
 
     def open_rtu(self):
         port = self.port.get().strip()
@@ -390,7 +349,6 @@ class TransportWidget(ttk.LabelFrame):
                 self._notify(f"Ошибка подключения: {resp['error']}", is_error=True)
             else:
                 self._log_event("✓ Запрос на подключение отправлен", "success")
-                # Опрос сам обновит состояние на Connected через 1-2 сек
         except Exception as e:
             self._connection_state = "error"
             self._last_status_info["error"] = str(e)
@@ -400,7 +358,6 @@ class TransportWidget(ttk.LabelFrame):
 
     def close(self):
         self._log_event("🔌 Отключение...")
-        # 🔹 СРАЗУ меняем состояние, чтобы интерфейс не висел
         self._connection_state = "disconnecting" 
         self._update_ui_state()
         
@@ -414,10 +371,8 @@ class TransportWidget(ttk.LabelFrame):
                 self._connection_state = "error"
             else:
                 self._log_event("✓ Запрос на отключение отправлен", "success")
-                # 🔹 ЯВНЫЙ СБРОС СОСТОЯНИЯ
                 self._connection_state = "disconnected"
                 self._last_status_info = {}
-                # Очищаем панель инфо сразу
                 self.info_text.config(state="normal")
                 self.info_text.delete("1.0", "end")
                 self.info_text.config(state="disabled")
@@ -426,10 +381,6 @@ class TransportWidget(ttk.LabelFrame):
             self._connection_state = "error"
         finally:
             self._update_ui_state()
-
-    # =========================================================
-    # TEST CONNECTION
-    # =========================================================
 
     def test_connection(self):
         if self._connection_state != "connected":
@@ -459,10 +410,6 @@ class TransportWidget(ttk.LabelFrame):
                 self.test_btn.config(state="normal", text="🔍 Тест связи")
 
         self.after(10, _do_test)
-
-    # =========================================================
-    # CLEANUP
-    # =========================================================
 
     def destroy(self):
         self._stop_status_poll()

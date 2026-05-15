@@ -6,7 +6,6 @@ from typing import List, Dict, Any, Optional
 
 
 class RegisterMapWidget(ttk.LabelFrame):
-    """Виджет карты регистров Modbus — упрощённая версия"""
     
     IS_APP_WIDGET = True
     PANEL_TITLE = "2.Карта регистров"
@@ -28,34 +27,21 @@ class RegisterMapWidget(ttk.LabelFrame):
 
         self.rows: List[Dict[str, Any]] = []
         self.transport_online = False
-
-        # Настройки режима
         self.slave_mode = tk.StringVar(value="broadcast")
         self.slave_id = tk.StringVar(value="1")
         self.search_var = tk.StringVar()
-
-        # Состояние операций
         self._bulk_read_active = False
         self._bulk_index = 0
         self._bulk_delay_ms = 40
         self._bulk_errors = 0
-
-        # Опрос транспорта
         self._transport_poll_active = False
         self._transport_poll_interval = 3000
-
         self._build()
         self.after(300, self._check_transport_status)
-
-    # =========================================================
-    # UI BUILD
-    # =========================================================
 
     def _build(self):
         body = ttk.Frame(self, style="Panel.TFrame")
         body.pack(fill="both", expand=True)
-
-        # ----------------- TOP PANEL -----------------
         top = ttk.Frame(body, style="Panel.TFrame")
         top.pack(fill="x", padx=8, pady=8)
 
@@ -79,17 +65,12 @@ class RegisterMapWidget(ttk.LabelFrame):
 
         ttk.Button(top, text="CSV", command=self.load_csv, style="Secondary.TButton").grid(row=0, column=7, padx=(10, 0))
         ttk.Button(top, text="Read All", command=self.read_all, style="App.TButton").grid(row=0, column=8, padx=(10, 0))
-        # ✅ Оставлена только кнопка записи выбранного
         ttk.Button(top, text="Write Selected", command=self.write_selected,
                    style="Primary.TButton").grid(row=0, column=9, padx=(4, 0))
 
         top.columnconfigure(6, weight=1)
-
-        # ----------------- STATUS LABEL -----------------
         self.status_label = ttk.Label(body, text="Transport: UNKNOWN", padding=(8, 4))
         self.status_label.pack(fill="x", padx=8, pady=(0, 4))
-
-        # ----------------- TABLE -----------------
         columns = ("address", "name", "type", "min", "max", "description", "value")
         table_frame = ttk.Frame(body)
         table_frame.pack(fill="both", expand=True, padx=8, pady=(0, 8))
@@ -111,7 +92,6 @@ class RegisterMapWidget(ttk.LabelFrame):
 
         self.tree.bind("<Double-1>", self._edit_value)
 
-        # ----------------- BOTTOM PANEL -----------------
         bottom = ttk.Frame(body, style="Panel.TFrame")
         bottom.pack(fill="x", padx=8, pady=(0, 8))
 
@@ -121,10 +101,6 @@ class RegisterMapWidget(ttk.LabelFrame):
                    style="Secondary.TButton").pack(side="left")
         ttk.Button(bottom, text="Stop", command=self.stop_bulk,
                    style="Secondary.TButton").pack(side="left", padx=(4, 0))
-
-    # =========================================================
-    # SLAVE ID INPUT SWITCHING
-    # =========================================================
 
     def _build_slave_id_input(self):
         for widget in self.slave_id_frame.winfo_children():
@@ -151,19 +127,11 @@ class RegisterMapWidget(ttk.LabelFrame):
         except (ValueError, TypeError):
             return 1
 
-    # =========================================================
-    # LOGGING
-    # =========================================================
-
     def _notify(self, msg: str, is_error: bool = False):
         if self.on_log:
             self.on_log(msg)
         if is_error:
             messagebox.showerror("Register Map", msg)
-
-    # =========================================================
-    # TRANSPORT STATUS
-    # =========================================================
 
     def _check_transport_status(self):
         if self._transport_poll_active:
@@ -197,10 +165,6 @@ class RegisterMapWidget(ttk.LabelFrame):
             text = f"✓ {conn_type}: connected"
         self.status_label.config(text=text)
 
-    # =========================================================
-    # HELPERS
-    # =========================================================
-
     def _get_count_for_type(self, typ: str) -> int:
         return self.TYPE_REGISTER_COUNT.get(typ, 1)
 
@@ -214,7 +178,6 @@ class RegisterMapWidget(ttk.LabelFrame):
             return None
 
     def _validate_range(self, reg: Dict[str, Any], value: Any) -> bool:
-        """Проверка значения на соответствие мин/макс"""
         try:
             min_val = reg.get("min", "")
             max_val = reg.get("max", "")
@@ -223,7 +186,6 @@ class RegisterMapWidget(ttk.LabelFrame):
             if not min_val and not max_val:
                 return True
             
-            # Специальная обработка для Array: проверяем каждый байт
             if typ == "Array":
                 bytes_str = str(value).strip()
                 if not bytes_str:
@@ -241,7 +203,6 @@ class RegisterMapWidget(ttk.LabelFrame):
                         return False
                 return True
             
-            # Стандартная проверка для чисел
             num = self._parse_numeric(str(value))
             if num is None:
                 return False
@@ -256,10 +217,6 @@ class RegisterMapWidget(ttk.LabelFrame):
             return True
         except:
             return True
-
-    # =========================================================
-    # CSV LOADING
-    # =========================================================
 
     def load_csv(self):
         path = filedialog.askopenfilename(filetypes=[("CSV", "*.csv")])
@@ -312,10 +269,6 @@ class RegisterMapWidget(ttk.LabelFrame):
             return
         self._refresh_table()
 
-    # =========================================================
-    # FILTER & REFRESH
-    # =========================================================
-
     def _apply_filter(self, event=None):
         self._refresh_table()
 
@@ -333,7 +286,6 @@ class RegisterMapWidget(ttk.LabelFrame):
             ))
 
     def _refresh_row(self, index: int):
-        """Простое обновление строки без подсветки"""
         iid = str(index)
         if not self.tree.exists(iid):
             return
@@ -342,10 +294,6 @@ class RegisterMapWidget(ttk.LabelFrame):
             f"0x{reg['address']:04X}", reg["name"], reg["type"],
             reg["min"], reg["max"], reg["description"], reg["value"]
         ))
-
-    # =========================================================
-    # READ OPERATIONS
-    # =========================================================
 
     def read_all(self):
         if self._bulk_read_active:
@@ -414,10 +362,6 @@ class RegisterMapWidget(ttk.LabelFrame):
             reg["value"] = f"ERR: decode: {e}"
         self._refresh_row(index)
 
-    # =========================================================
-    # WRITE SELECTED ONLY
-    # =========================================================
-
     def write_selected(self):
         """Запись только выбранной строки"""
         sel = self.tree.selection()
@@ -439,7 +383,6 @@ class RegisterMapWidget(ttk.LabelFrame):
 
         reg = self.rows[index]
 
-        # Валидация диапазона
         if not self._validate_range(reg, reg["value"]):
             self._notify(f"Value out of range for {reg['name']}", is_error=True)
             return
@@ -471,22 +414,13 @@ class RegisterMapWidget(ttk.LabelFrame):
         result = resp.get("result", {})
         if result.get("accepted"):
             self._notify(f"Written: {reg['name']}")
-            # Перечитываем значение после записи для актуальности
             self._read_row(index)
         else:
             self._notify(f"Write acknowledged: {reg['name']}")
 
-    # =========================================================
-    # STOP BULK
-    # =========================================================
-
     def stop_bulk(self):
         self._bulk_read_active = False
         self._notify("Bulk operation stopped")
-
-    # =========================================================
-    # CODEC: DECODE / ENCODE
-    # =========================================================
 
     def _decode_value(self, typ: str, values: List[int]) -> Any:
         if not values:
@@ -562,10 +496,6 @@ class RegisterMapWidget(ttk.LabelFrame):
             return [int(value) & 0xFFFF]
         except Exception as e:
             raise ValueError(f"Encode error ({typ}): {e}")
-
-    # =========================================================
-    # INLINE EDIT
-    # =========================================================
 
     def _edit_value(self, event):
         item = self.tree.identify_row(event.y)
